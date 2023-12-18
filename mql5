@@ -1,0 +1,122 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                      Stock Trader Pro MT5.mq5 | 
+//|                                  forexroboteasy.com             |
+//|                                      Forex Robot Easy Team       |
+//+------------------------------------------------------------------+
+
+// Define necessary input parameters
+input int MA_Period = 14; // Moving Average period
+input int ATR_Period = 14; // Average True Range period
+input int CCI_Period = 14; // Commodity Channel Index period
+input int Stochastic_K_Period = 14; // Stochastic K period
+input int Stochastic_D_Period = 3; // Stochastic D period
+input int RSI_Period = 14; // Relative Strength Index period
+input double StopLoss = 100; // Stop Loss in pips
+input double TakeProfit = 200; // Take Profit in pips
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+    // Add necessary indicators
+    IndicatorSetInteger(INDICATOR_DIGITS, 5);
+    IndicatorSetString(INDICATOR_SHORTNAME, 'Stock Trader Pro MT5');
+    
+    IndicatorSetInteger(0, INDICATOR_MA, MA_Period);
+    IndicatorSetInteger(1, INDICATOR_ATR, ATR_Period);
+    IndicatorSetInteger(2, INDICATOR_CCI, CCI_Period);
+    IndicatorSetInteger(3, INDICATOR_STOCHASTIC, Stochastic_K_Period, Stochastic_D_Period);
+    IndicatorSetInteger(4, INDICATOR_RSI, RSI_Period);
+    
+    return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+    // Remove added indicators
+    IndicatorRelease(0);
+    IndicatorRelease(1);
+    IndicatorRelease(2);
+    IndicatorRelease(3);
+    IndicatorRelease(4);
+}
+
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    // Get current price
+    double price = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+    
+    // Calculate indicators values
+    double ma = iMA(_Symbol, 0, MA_Period, 0, MODE_SMA, PRICE_CLOSE, 0);
+    double atr = iATR(_Symbol, 0, ATR_Period, 0);
+    double cci = iCCI(_Symbol, 0, CCI_Period, PRICE_TYPICAL, 0);
+    double stochastic_k = iStochastic(_Symbol, 0, Stochastic_K_Period, 0, 0, MODE_SMA, 0);
+    double stochastic_d = iStochastic(_Symbol, 0, Stochastic_K_Period, Stochastic_D_Period, 0, MODE_SMA, 0);
+    double rsi = iRSI(_Symbol, 0, RSI_Period, PRICE_CLOSE, 0);
+    
+    // Check if conditions are met for opening a long position
+    if (price > ma && cci > 0 && rsi > 50 && stochastic_k > stochastic_d && stochastic_d < 20)
+    {
+        // Calculate lot size based on account balance and risk
+        double lotSize = AccountBalance() * 0.01 / atr;
+        
+        // Open long position
+        int ticket = OrderSend(_Symbol, OP_BUY, lotSize, price, 0, price - StopLoss * _Point, price + TakeProfit * _Point, 'StockTraderPro', 0, 0, Green);
+        
+        if (ticket > 0)
+        {
+            // Print trade information
+            Print('Long position opened at ', price);
+            
+            // Uncomment the line below to enable email notifications
+            // SendNotification('StockTraderPro: Long position opened at ', DoubleToString(price, _Digits));
+        }
+        else
+        {
+            // Print error message
+            Print('Error opening long position: ', GetLastError());
+        }
+    }
+    
+    // Check if conditions are met for closing a long position
+    if (OrderSelect(0, SELECT_BY_POS, MODE_TRADES))
+    {
+        if (OrderType() == OP_BUY)
+        {
+            if (price < ma || cci < 0 || rsi < 50 || stochastic_k < stochastic_d || stochastic_d > 80)
+            {
+                // Close long position
+                bool closed = OrderClose(OrderTicket(), OrderLots(), price, 0, Red);
+                
+                if (closed)
+                {
+                    // Print trade information
+                    Print('Long position closed at ', price);
+                    
+                    // Uncomment the line below to enable email notifications
+                    // SendNotification('StockTraderPro: Long position closed at ', DoubleToString(price, _Digits));
+                }
+                else
+                {
+                    // Print error message
+                    Print('Error closing long position: ', GetLastError());
+                }
+            }
+        }
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Custom functions                                                 |
+//+------------------------------------------------------------------+
+// Add any custom functions required for implementing the trading algorithm
+// ...
+
